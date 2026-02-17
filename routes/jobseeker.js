@@ -13,6 +13,8 @@ router.put(
     { name: 'profilePhoto', maxCount: 1 },
     { name: 'panCardImage', maxCount: 1 },
     { name: 'aadhaarCardImage', maxCount: 1 },
+    { name: 'aadhaarCardFrontImage', maxCount: 1 },
+    { name: 'aadhaarCardBackImage', maxCount: 1 },
   ]),
   jobSeekerController.updateMyProfile
 );

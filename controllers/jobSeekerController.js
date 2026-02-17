@@ -156,6 +156,46 @@ exports.updateMyProfile = async (req, res) => {
         publicId: up.public_id,
         bytes: up.bytes,
       });
+      // Backward compatible mapping
+      js.set('documents.aadhaarCardFrontImage', {
+        url: up.secure_url,
+        filename: image.originalname,
+        uploadedAt: new Date(),
+        publicId: up.public_id,
+        bytes: up.bytes,
+      });
+    }
+
+    if (req.files?.aadhaarCardFrontImage?.[0]) {
+      const image = req.files.aadhaarCardFrontImage[0];
+      const up = await uploadToCloudinary(
+        image.buffer,
+        `lifemate/jobseekers/${js._id}/documents`,
+        'image'
+      );
+      js.set('documents.aadhaarCardFrontImage', {
+        url: up.secure_url,
+        filename: image.originalname,
+        uploadedAt: new Date(),
+        publicId: up.public_id,
+        bytes: up.bytes,
+      });
+    }
+
+    if (req.files?.aadhaarCardBackImage?.[0]) {
+      const image = req.files.aadhaarCardBackImage[0];
+      const up = await uploadToCloudinary(
+        image.buffer,
+        `lifemate/jobseekers/${js._id}/documents`,
+        'image'
+      );
+      js.set('documents.aadhaarCardBackImage', {
+        url: up.secure_url,
+        filename: image.originalname,
+        uploadedAt: new Date(),
+        publicId: up.public_id,
+        bytes: up.bytes,
+      });
     }
 
     await js.save();
