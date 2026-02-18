@@ -100,6 +100,16 @@ const jobSchema = new mongoose.Schema({
   description: { type: String, trim: true, maxlength: 5000 },
   responsibilities: [{ type: String, trim: true, maxlength: 500 }],
   requirements: [{ type: String, trim: true, maxlength: 500 }],
+  screeningQuestions: [{
+    question: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: [200, 'Screening question cannot exceed 200 characters'],
+    },
+    required: { type: Boolean, default: false },
+    order: { type: Number, default: 0, min: 0 },
+  }],
   benefits: [{ type: String, trim: true, maxlength: 300 }],
 
   // Lifecycle and moderation

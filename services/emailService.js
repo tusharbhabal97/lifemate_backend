@@ -35,13 +35,13 @@ const sendApplicationSubmittedToJobSeeker = async (candidateEmail, candidateName
     const transporter = createTransporter();
 
     const mailOptions = {
-      from: `"LifeMate" <${process.env.EMAIL_FROM || 'noreply@lifemate.com'}>`,
+      from: `"CareerMed" <${process.env.EMAIL_FROM || 'noreply@careermed.com'}>`,
       to: candidateEmail,
       subject: `Application Submitted: ${jobTitle} at ${companyName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">LifeMate</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px;">CareerMed</h1>
             <p style="color: white; margin: 10px 0 0 0; font-size: 16px;">Healthcare Job Platform</p>
           </div>
 
@@ -58,7 +58,7 @@ const sendApplicationSubmittedToJobSeeker = async (candidateEmail, candidateName
           </div>
 
           <div style="background: #333; padding: 20px; text-align: center;">
-            <p style="color: #999; margin: 0; font-size: 14px;">© 2024 LifeMate. All rights reserved.</p>
+            <p style="color: #999; margin: 0; font-size: 14px;">© 2024 CareerMed. All rights reserved.</p>
           </div>
         </div>
       `,
@@ -74,41 +74,80 @@ const sendApplicationSubmittedToJobSeeker = async (candidateEmail, candidateName
 };
 
 /**
- * Notify jobseeker: application status update (Interview/Offered)
+ * Notify jobseeker: application status update (all statuses)
  */
 const sendApplicationStatusUpdateToJobSeeker = async (candidateEmail, candidateName, jobTitle, companyName, status) => {
   try {
     const transporter = createTransporter();
 
-    const statusColor = status === 'Offered' ? '#28a745' : '#1e90ff';
-    const subject = status === 'Offered'
-      ? `Congratulations! Offer for ${jobTitle}`
-      : `You're moved to Interview for ${jobTitle}`;
+    const statusConfig = {
+      Applied: {
+        color: '#1e90ff',
+        subject: `Application received for ${jobTitle}`,
+        title: 'Application Received',
+      },
+      'Under Review': {
+        color: '#f59e0b',
+        subject: `Application under review for ${jobTitle}`,
+        title: 'Application Under Review',
+      },
+      Shortlisted: {
+        color: '#6366f1',
+        subject: `You are shortlisted for ${jobTitle}`,
+        title: 'You Are Shortlisted',
+      },
+      Interview: {
+        color: '#7c3aed',
+        subject: `Interview stage for ${jobTitle}`,
+        title: 'Interview Stage Update',
+      },
+      Offered: {
+        color: '#22c55e',
+        subject: `Congratulations! Offer for ${jobTitle}`,
+        title: 'Offer Update',
+      },
+      Rejected: {
+        color: '#ef4444',
+        subject: `Application update for ${jobTitle}`,
+        title: 'Application Status Update',
+      },
+      Withdrawn: {
+        color: '#64748b',
+        subject: `Application withdrawn for ${jobTitle}`,
+        title: 'Application Withdrawn',
+      },
+    };
+
+    const selectedStatus = statusConfig[status] || {
+      color: '#1e90ff',
+      subject: `Application status updated for ${jobTitle}`,
+      title: 'Application Status Updated',
+    };
 
     const mailOptions = {
-      from: `"LifeMate" <${process.env.EMAIL_FROM || 'noreply@lifemate.com'}>`,
+      from: `"CareerMed" <${process.env.EMAIL_FROM || 'noreply@careermed.com'}>`,
       to: candidateEmail,
-      subject: `${subject} - ${companyName}`,
+      subject: `${selectedStatus.subject} - ${companyName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">LifeMate</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px;">CareerMed</h1>
             <p style="color: white; margin: 10px 0 0 0; font-size: 16px;">Healthcare Job Platform</p>
           </div>
 
           <div style="padding: 30px; background: #f8f9fa;">
-            <h2 style="color: ${statusColor}; margin-bottom: 20px;">${subject}</h2>
+            <h2 style="color: ${selectedStatus.color}; margin-bottom: 20px;">${selectedStatus.title}</h2>
             <p style="color: #666; line-height: 1.6;">Hi ${candidateName},</p>
             <p style="color: #666; line-height: 1.6;">Your application for <strong>${jobTitle}</strong> at <strong>${companyName}</strong> has been updated to <strong>${status}</strong>.</p>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${process.env.FRONTEND_URL}/jobseeker/applications" style="background: ${statusColor}; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+              <a href="${process.env.FRONTEND_URL}/dashboard/jobseeker/applications" style="background: ${selectedStatus.color}; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
                 View details
               </a>
             </div>
           </div>
 
           <div style="background: #333; padding: 20px; text-align: center;">
-            <p style="color: #999; margin: 0; font-size: 14px;">© 2024 LifeMate. All rights reserved.</p>
+            <p style="color: #999; margin: 0; font-size: 14px;">© 2024 CareerMed. All rights reserved.</p>
           </div>
         </div>
       `,
@@ -136,21 +175,21 @@ const sendVerificationEmail = async (email, token, firstName) => {
     const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${token}`;
     
     const mailOptions = {
-      from: `"LifeMate" <${process.env.EMAIL_FROM || 'noreply@lifemate.com'}>`,
+      from: `"CareerMed" <${process.env.EMAIL_FROM || 'noreply@careermed.com'}>`,
       to: email,
-      subject: 'Verify Your Email Address - LifeMate',
+      subject: 'Verify Your Email Address - CareerMed',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">LifeMate</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px;">CareerMed</h1>
             <p style="color: white; margin: 10px 0 0 0; font-size: 16px;">Healthcare Job Platform</p>
           </div>
           
           <div style="padding: 30px; background: #f8f9fa;">
-            <h2 style="color: #333; margin-bottom: 20px;">Welcome to LifeMate, ${firstName}!</h2>
+            <h2 style="color: #333; margin-bottom: 20px;">Welcome to CareerMed, ${firstName}!</h2>
             
             <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
-              Thank you for registering with LifeMate. To complete your registration and start exploring healthcare job opportunities, please verify your email address by clicking the button below.
+              Thank you for registering with CareerMed. To complete your registration and start exploring healthcare job opportunities, please verify your email address by clicking the button below.
             </p>
             
             <div style="text-align: center; margin: 30px 0;">
@@ -169,13 +208,13 @@ const sendVerificationEmail = async (email, token, firstName) => {
             </p>
             
             <p style="color: #666; line-height: 1.6; margin-top: 30px; font-size: 14px;">
-              This verification link will expire in 24 hours. If you didn't create an account with LifeMate, please ignore this email.
+              This verification link will expire in 24 hours. If you didn't create an account with CareerMed, please ignore this email.
             </p>
           </div>
           
           <div style="background: #333; padding: 20px; text-align: center;">
             <p style="color: #999; margin: 0; font-size: 14px;">
-              © 2024 LifeMate. All rights reserved.
+              © 2024 CareerMed. All rights reserved.
             </p>
             <p style="color: #999; margin: 5px 0 0 0; font-size: 12px;">
               This is an automated email. Please do not reply to this message.
@@ -207,13 +246,13 @@ const sendPasswordResetEmail = async (email, token, firstName) => {
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${token}`;
     
     const mailOptions = {
-      from: `"LifeMate" <${process.env.EMAIL_FROM || 'noreply@lifemate.com'}>`,
+      from: `"CareerMed" <${process.env.EMAIL_FROM || 'noreply@careermed.com'}>`,
       to: email,
-      subject: 'Reset Your Password - LifeMate',
+      subject: 'Reset Your Password - CareerMed',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">LifeMate</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px;">CareerMed</h1>
             <p style="color: white; margin: 10px 0 0 0; font-size: 16px;">Healthcare Job Platform</p>
           </div>
           
@@ -225,7 +264,7 @@ const sendPasswordResetEmail = async (email, token, firstName) => {
             </p>
             
             <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
-              We received a request to reset your password for your LifeMate account. If you made this request, click the button below to reset your password.
+              We received a request to reset your password for your CareerMed account. If you made this request, click the button below to reset your password.
             </p>
             
             <div style="text-align: center; margin: 30px 0;">
@@ -254,7 +293,7 @@ const sendPasswordResetEmail = async (email, token, firstName) => {
           
           <div style="background: #333; padding: 20px; text-align: center;">
             <p style="color: #999; margin: 0; font-size: 14px;">
-              © 2024 LifeMate. All rights reserved.
+              © 2024 CareerMed. All rights reserved.
             </p>
             <p style="color: #999; margin: 5px 0 0 0; font-size: 12px;">
               This is an automated email. Please do not reply to this message.
@@ -290,13 +329,13 @@ const sendOtpEmail = async (email, firstName, otp, purpose) => {
         : 'Use this OTP to reset your account password.';
 
     const mailOptions = {
-      from: `"LifeMate" <${process.env.EMAIL_FROM || 'noreply@lifemate.com'}>`,
+      from: `"CareerMed" <${process.env.EMAIL_FROM || 'noreply@careermed.com'}>`,
       to: email,
-      subject: `${title} - LifeMate`,
+      subject: `${title} - CareerMed`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">LifeMate</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px;">CareerMed</h1>
             <p style="color: white; margin: 10px 0 0 0; font-size: 16px;">Healthcare Job Platform</p>
           </div>
 
@@ -323,7 +362,7 @@ const sendOtpEmail = async (email, firstName, otp, purpose) => {
           </div>
 
           <div style="background: #333; padding: 20px; text-align: center;">
-            <p style="color: #999; margin: 0; font-size: 14px;">© 2024 LifeMate. All rights reserved.</p>
+            <p style="color: #999; margin: 0; font-size: 14px;">© 2024 CareerMed. All rights reserved.</p>
             <p style="color: #999; margin: 5px 0 0 0; font-size: 12px;">This is an automated email. Please do not reply.</p>
           </div>
         </div>
@@ -352,13 +391,13 @@ const sendApplicationNotificationEmail = async (employerEmail, employerName, job
     const transporter = createTransporter();
     
     const mailOptions = {
-      from: `"LifeMate" <${process.env.EMAIL_FROM || 'noreply@lifemate.com'}>`,
+      from: `"CareerMed" <${process.env.EMAIL_FROM || 'noreply@careermed.com'}>`,
       to: employerEmail,
-      subject: `New Application for ${jobTitle} - LifeMate`,
+      subject: `New Application for ${jobTitle} - CareerMed`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">LifeMate</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px;">CareerMed</h1>
             <p style="color: white; margin: 10px 0 0 0; font-size: 16px;">Healthcare Job Platform</p>
           </div>
           
@@ -389,13 +428,13 @@ const sendApplicationNotificationEmail = async (employerEmail, employerName, job
             </div>
             
             <p style="color: #666; line-height: 1.6; margin-top: 30px; font-size: 14px;">
-              Log in to your LifeMate employer dashboard to review the full application and candidate profile.
+              Log in to your CareerMed employer dashboard to review the full application and candidate profile.
             </p>
           </div>
           
           <div style="background: #333; padding: 20px; text-align: center;">
             <p style="color: #999; margin: 0; font-size: 14px;">
-              © 2024 LifeMate. All rights reserved.
+              © 2024 CareerMed. All rights reserved.
             </p>
             <p style="color: #999; margin: 5px 0 0 0; font-size: 12px;">
               This is an automated email. Please do not reply to this message.
@@ -427,13 +466,13 @@ const sendInterviewInvitationEmail = async (candidateEmail, candidateName, jobTi
     const transporter = createTransporter();
     
     const mailOptions = {
-      from: `"LifeMate" <${process.env.EMAIL_FROM || 'noreply@lifemate.com'}>`,
+      from: `"CareerMed" <${process.env.EMAIL_FROM || 'noreply@careermed.com'}>`,
       to: candidateEmail,
       subject: `Interview Invitation for ${jobTitle} - ${companyName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">LifeMate</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px;">CareerMed</h1>
             <p style="color: white; margin: 10px 0 0 0; font-size: 16px;">Healthcare Job Platform</p>
           </div>
           
@@ -466,13 +505,13 @@ const sendInterviewInvitationEmail = async (candidateEmail, candidateName, jobTi
             </div>
             
             <p style="color: #666; line-height: 1.6; margin-top: 30px; font-size: 14px;">
-              Please confirm your attendance by replying to this email or through your LifeMate dashboard.
+              Please confirm your attendance by replying to this email or through your CareerMed dashboard.
             </p>
           </div>
           
           <div style="background: #333; padding: 20px; text-align: center;">
             <p style="color: #999; margin: 0; font-size: 14px;">
-              © 2024 LifeMate. All rights reserved.
+              © 2024 CareerMed. All rights reserved.
             </p>
             <p style="color: #999; margin: 5px 0 0 0; font-size: 12px;">
               This is an automated email. Please do not reply to this message.
@@ -506,13 +545,13 @@ const sendWelcomeEmail = async (email, firstName, role) => {
       : `${process.env.FRONTEND_URL}/employer/dashboard`;
     
     const mailOptions = {
-      from: `"LifeMate" <${process.env.EMAIL_FROM || 'noreply@lifemate.com'}>`,
+      from: `"CareerMed" <${process.env.EMAIL_FROM || 'noreply@careermed.com'}>`,
       to: email,
-      subject: 'Welcome to LifeMate - Your Healthcare Career Journey Starts Here!',
+      subject: 'Welcome to CareerMed - Your Healthcare Career Journey Starts Here!',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to LifeMate!</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to CareerMed!</h1>
             <p style="color: white; margin: 10px 0 0 0; font-size: 16px;">Healthcare Job Platform</p>
           </div>
           
@@ -520,7 +559,7 @@ const sendWelcomeEmail = async (email, firstName, role) => {
             <h2 style="color: #333; margin-bottom: 20px;">Hello ${firstName}!</h2>
             
             <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
-              Welcome to LifeMate, the premier platform connecting healthcare professionals with amazing career opportunities!
+              Welcome to CareerMed, the premier platform connecting healthcare professionals with amazing career opportunities!
             </p>
             
             <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
@@ -560,7 +599,7 @@ const sendWelcomeEmail = async (email, firstName, role) => {
           
           <div style="background: #333; padding: 20px; text-align: center;">
             <p style="color: #999; margin: 0; font-size: 14px;">
-              © 2024 LifeMate. All rights reserved.
+              © 2024 CareerMed. All rights reserved.
             </p>
             <p style="color: #999; margin: 5px 0 0 0; font-size: 12px;">
               This is an automated email. Please do not reply to this message.
@@ -588,20 +627,20 @@ const sendNewsletterSubscriptionEmail = async (email) => {
     const transporter = createTransporter();
 
     const mailOptions = {
-      from: `"LifeMate" <${process.env.EMAIL_FROM || 'noreply@lifemate.com'}>`,
+      from: `"CareerMed" <${process.env.EMAIL_FROM || 'noreply@careermed.com'}>`,
       to: email,
-      subject: 'Subscribed Successfully - LifeMate Career Updates',
+      subject: 'Subscribed Successfully - CareerMed Career Updates',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #155DFC 0%, #00B8DB 100%); padding: 28px; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">LifeMate</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px;">CareerMed</h1>
             <p style="color: white; margin: 10px 0 0 0; font-size: 15px;">Healthcare Career Platform</p>
           </div>
 
           <div style="padding: 28px; background: #f8f9fa;">
             <h2 style="color: #111827; margin-top: 0;">Subscription Confirmed</h2>
             <p style="color: #4b5563; line-height: 1.7;">
-              You are now subscribed to LifeMate updates. We will share relevant healthcare hiring trends,
+              You are now subscribed to CareerMed updates. We will share relevant healthcare hiring trends,
               new opportunities, and career tips.
             </p>
             <div style="text-align: center; margin: 26px 0 8px;">
@@ -612,7 +651,7 @@ const sendNewsletterSubscriptionEmail = async (email) => {
           </div>
 
           <div style="background: #111827; padding: 18px; text-align: center;">
-            <p style="color: #9ca3af; margin: 0; font-size: 12px;">© 2024 LifeMate. All rights reserved.</p>
+            <p style="color: #9ca3af; margin: 0; font-size: 12px;">© 2024 CareerMed. All rights reserved.</p>
           </div>
         </div>
       `,

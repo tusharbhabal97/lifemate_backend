@@ -20,13 +20,26 @@ const {
 } = require("../services/notificationService");
 
 const { uploadToCloudinary } = require("../config/cloudinary");
+
+const APPLICATION_STATUSES = [
+  "Applied",
+  "Under Review",
+  "Shortlisted",
+  "Interview",
+  "Offered",
+  "Rejected",
+  "Withdrawn",
+];
+
 // Build filters for list endpoints
 const buildFilters = (q = {}) => {
   const f = {};
   if (q.status) f.status = q.status;
-  if (q.job) f.job = q.job;
+  if (q.job || q.jobId) f.job = q.job || q.jobId;
   if (q.employer) f.employer = q.employer;
   if (q.jobSeeker) f.jobSeeker = q.jobSeeker;
+  if (q.viewed === "true") f.isViewedByEmployer = true;
+  if (q.viewed === "false") f.isViewedByEmployer = false;
   if (q.dateFrom || q.dateTo) {
     f.appliedAt = {};
     if (q.dateFrom) f.appliedAt.$gte = new Date(q.dateFrom);
@@ -70,12 +83,82 @@ exports.apply = async (req, res) => {
     }
     if (!Array.isArray(answers)) answers = [];
 
+    const configuredScreeningQuestions = Array.isArray(job.screeningQuestions)
+      ? job.screeningQuestions
+          .map((item) => {
+            if (!item || typeof item.question !== "string") return null;
+            return {
+              id: item._id ? String(item._id) : "",
+              question: item.question.trim(),
+              required: Boolean(item.required),
+            };
+          })
+          .filter(Boolean)
+      : [];
+
+    const normalizedAnswers = answers
+      .map((item) => {
+        if (!item) return null;
+        const questionId =
+          typeof item.questionId === "string" ? item.questionId.trim() : "";
+        const question =
+          typeof item.question === "string" ? item.question.trim() : "";
+        const answer = typeof item.answer === "string" ? item.answer.trim() : "";
+        if (!answer) return null;
+        return { questionId, question, answer };
+      })
+      .filter(Boolean);
+
+    let finalAnswers = normalizedAnswers;
+    if (configuredScreeningQuestions.length > 0) {
+      const answerByQuestionId = new Map(
+        normalizedAnswers
+          .filter((item) => item.questionId)
+          .map((item) => [item.questionId, item])
+      );
+      const answerByQuestionText = new Map(
+        normalizedAnswers
+          .filter((item) => item.question)
+          .map((item) => [item.question.toLowerCase(), item])
+      );
+
+      const missingRequired = configuredScreeningQuestions
+        .filter((q) => q.required)
+        .find((q) => {
+          const byId = q.id ? answerByQuestionId.get(q.id) : null;
+          const byText = answerByQuestionText.get(q.question.toLowerCase());
+          return !((byId && byId.answer) || (byText && byText.answer));
+        });
+
+      if (missingRequired) {
+        return validationErrorResponse(res, [
+          {
+            field: "answers",
+            message: `Required screening question missing answer: "${missingRequired.question}"`,
+          },
+        ]);
+      }
+
+      finalAnswers = configuredScreeningQuestions
+        .map((q) => {
+          const matched = (q.id && answerByQuestionId.get(q.id)) ||
+            answerByQuestionText.get(q.question.toLowerCase());
+          if (!matched || !matched.answer) return null;
+          return {
+            questionId: q.id,
+            question: q.question,
+            answer: matched.answer,
+          };
+        })
+        .filter(Boolean);
+    }
+
     const payload = {
       job: job._id,
       jobSeeker: jobSeeker._id,
       employer: employer._id,
       coverLetter,
-      answers,
+      answers: finalAnswers,
     };
 
     // Handle optional file uploads (multer memory storage is used in route)
@@ -366,10 +449,15 @@ exports.listEmployerApplications = async (req, res) => {
 
     const [items, total] = await Promise.all([
       Application.find(filters)
-        .populate({ path: "job" })
+        .populate({ path: "job", select: "title organizationName location status jobType" })
         .populate({
           path: "jobSeeker",
-          populate: { path: "user", select: "firstName lastName email phone" },
+          select:
+            "title specializations experience resume coverLetter professionalInfo personalInfo",
+          populate: {
+            path: "user",
+            select: "firstName lastName email phone profileImage",
+          },
         })
         .sort(sort)
         .skip(skip)
@@ -395,6 +483,8 @@ exports.getById = async (req, res) => {
       .populate("job")
       .populate({
         path: "jobSeeker",
+        select:
+          "title bio specializations experience education workExperience skills certifications resume coverLetter personalInfo professionalInfo profileCompletion",
         populate: {
           path: "user",
           select: "firstName lastName email phone profileImage role",
@@ -442,6 +532,13 @@ exports.getById = async (req, res) => {
 // PATCH /applications/:id/status (employer/admin)
 exports.updateStatus = async (req, res) => {
   try {
+    const { status, note } = req.body;
+    if (!APPLICATION_STATUSES.includes(status)) {
+      return validationErrorResponse(res, [
+        { field: "status", message: "Invalid application status" },
+      ]);
+    }
+
     const application = await Application.findById(req.params.id)
       .populate("job")
       .populate({
@@ -468,7 +565,6 @@ exports.updateStatus = async (req, res) => {
     }
 
     const oldStatus = application.status;
-    const { status, note } = req.body;
     const statusUpdatedAt = new Date();
     application.status = status;
     application.updatedAtManual = statusUpdatedAt;
@@ -497,7 +593,7 @@ exports.updateStatus = async (req, res) => {
       }
     }
 
-    // Notify jobseeker on key status changes
+    // Notify jobseeker on status changes (all statuses)
     try {
       const candidateUserId = application.jobSeeker?.user?._id || application.jobSeeker?.user;
       notifyApplicationStatusChange({
@@ -510,7 +606,7 @@ exports.updateStatus = async (req, res) => {
         dedupeKey: `application-status:${application._id}:${statusUpdatedAt.getTime()}`,
       }).catch(() => {});
 
-      if (["Interview", "Offered"].includes(status)) {
+      if (oldStatus !== status) {
         const candidate = application.jobSeeker;
         const candidateName = candidate?.user
           ? `${candidate.user.firstName} ${candidate.user.lastName}`.trim()
@@ -587,6 +683,30 @@ exports.withdrawMine = async (req, res) => {
       await employer.updateHireStats(-1);
     }
 
+    // Notify jobseeker that application was withdrawn
+    try {
+      const candidate = await JobSeeker.findById(application.jobSeeker).populate({
+        path: "user",
+        select: "firstName lastName email",
+      });
+      const candidateName = candidate?.user
+        ? `${candidate.user.firstName} ${candidate.user.lastName}`.trim()
+        : "";
+      const candidateEmail = candidate?.user?.email;
+      const jobTitle = application.job?.title || "Your Application";
+      const companyName = employer?.organizationName || "Employer";
+
+      if (candidateEmail) {
+        sendApplicationStatusUpdateToJobSeeker(
+          candidateEmail,
+          candidateName,
+          jobTitle,
+          companyName,
+          "Withdrawn"
+        ).catch(() => {});
+      }
+    } catch (_) {}
+
     return successResponse(res, 200, "Application withdrawn successfully", {
       application,
     });
@@ -616,7 +736,11 @@ exports.listApplicationsForJob = async (req, res) => {
       .populate({ path: "job" })
       .populate({
         path: "jobSeeker",
-        populate: { path: "user", select: "firstName lastName email phone" },
+        select: "title specializations experience resume coverLetter",
+        populate: {
+          path: "user",
+          select: "firstName lastName email phone profileImage",
+        },
       })
       .sort("-appliedAt");
 

@@ -9,6 +9,30 @@ const {
 } = require('../utils/response');
 const { notifyMatchingJobSeekersForJob } = require('../services/notificationService');
 
+const normalizeScreeningQuestions = (raw) => {
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .map((item, index) => {
+      if (!item) return null;
+      const question =
+        typeof item === 'string'
+          ? item.trim()
+          : typeof item.question === 'string'
+            ? item.question.trim()
+            : '';
+
+      if (!question) return null;
+
+      return {
+        question,
+        required: Boolean(item.required),
+        order: Number.isFinite(item.order) ? Number(item.order) : index,
+      };
+    })
+    .filter(Boolean);
+};
+
 const buildJobFilters = (q) => {
   const f = {};
   if (q.status) f.status = q.status;
@@ -139,9 +163,10 @@ exports.create = async (req, res) => {
     const employer = await Employer.findOne({ user: req.user._id });
     if (!employer) return errorResponse(res, 403, 'Employer profile not found');
 
-    const payload = req.body;
+    const payload = { ...req.body };
     payload.employer = employer._id;
     payload.organizationName = employer.organizationName;
+    payload.screeningQuestions = normalizeScreeningQuestions(payload.screeningQuestions);
     if (!payload.location) {
       payload.location = {
         city: employer.address.city,
@@ -185,7 +210,14 @@ exports.update = async (req, res) => {
       }
     }
 
-    Object.assign(job, req.body);
+    const updates = { ...req.body };
+    if (Object.prototype.hasOwnProperty.call(updates, 'screeningQuestions')) {
+      updates.screeningQuestions = normalizeScreeningQuestions(
+        updates.screeningQuestions
+      );
+    }
+
+    Object.assign(job, updates);
     await job.save();
     return successResponse(res, 200, 'Job updated', { job });
   } catch (err) {
