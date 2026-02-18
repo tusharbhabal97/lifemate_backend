@@ -7,6 +7,7 @@ const {
   notFoundResponse,
   forbiddenResponse,
 } = require('../utils/response');
+const { notifyMatchingJobSeekersForJob } = require('../services/notificationService');
 
 const buildJobFilters = (q) => {
   const f = {};
@@ -154,6 +155,7 @@ exports.create = async (req, res) => {
     await employer.updateJobStats(1);
     if (job.status === 'Active') {
       await employer.updateActiveJobStats(1);
+      notifyMatchingJobSeekersForJob(job).catch(() => {});
     }
 
     return successResponse(res, 201, 'Job created', { job });
@@ -223,6 +225,7 @@ exports.changeStatus = async (req, res) => {
     if (oldStatus !== status) {
       if (status === 'Active' && oldStatus !== 'Active') {
         await employer.updateActiveJobStats(1);
+        notifyMatchingJobSeekersForJob(job).catch(() => {});
       } else if (oldStatus === 'Active' && status !== 'Active') {
         await employer.updateActiveJobStats(-1);
       }

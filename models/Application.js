@@ -31,6 +31,7 @@ const applicationSchema = new mongoose.Schema({
     index: true,
   },
   appliedAt: { type: Date, default: Date.now, index: true },
+  applyAttempts: { type: Number, min: 1, max: 2, default: 1 },
   updatedAtManual: { type: Date },
 
   // attachments / snapshots

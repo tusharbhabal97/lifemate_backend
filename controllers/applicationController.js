@@ -14,6 +14,10 @@ const {
   sendApplicationSubmittedToJobSeeker,
   sendApplicationStatusUpdateToJobSeeker,
 } = require("../services/emailService");
+const {
+  createNotification,
+  notifyApplicationStatusChange,
+} = require("../services/notificationService");
 
 const { uploadToCloudinary } = require("../config/cloudinary");
 // Build filters for list endpoints
@@ -35,7 +39,6 @@ const buildFilters = (q = {}) => {
 exports.apply = async (req, res) => {
   try {
     const job = await Job.findById(req.params.id);
-    console.log(job);
     if (!job || !job.isOpen())
       return notFoundResponse(res, "Job not open for applications");
 
@@ -111,11 +114,97 @@ exports.apply = async (req, res) => {
       });
     }
 
-    const application = await Application.create(payload);
+    const existingApplication = await Application.findOne({
+      job: job._id,
+      jobSeeker: jobSeeker._id,
+    });
+
+    let application = existingApplication;
+    let attemptNumber = 1;
+
+    if (existingApplication) {
+      const existingAttempts = Number(existingApplication.applyAttempts || 1);
+
+      if (existingApplication.status !== "Withdrawn") {
+        return errorResponse(res, 400, "You have already applied to this job");
+      }
+
+      if (existingAttempts >= 2) {
+        return errorResponse(
+          res,
+          400,
+          "You have reached the maximum apply attempts for this job and cannot apply again."
+        );
+      }
+
+      attemptNumber = existingAttempts + 1;
+      const reappliedAt = new Date();
+      existingApplication.status = "Applied";
+      existingApplication.appliedAt = reappliedAt;
+      existingApplication.updatedAtManual = reappliedAt;
+      existingApplication.applyAttempts = attemptNumber;
+      existingApplication.answers = payload.answers || [];
+
+      if (payload.resume) {
+        existingApplication.resume = payload.resume;
+      }
+
+      if (payload.coverLetter && Object.keys(payload.coverLetter).length > 0) {
+        existingApplication.coverLetter = Object.assign(
+          {},
+          existingApplication.coverLetter || {},
+          payload.coverLetter
+        );
+      }
+
+      existingApplication.history.push({
+        status: "Applied",
+        note: `Reapplied by candidate (attempt ${attemptNumber} of 2)`,
+        by: req.user._id,
+        at: reappliedAt,
+      });
+
+      await existingApplication.save();
+      application = existingApplication;
+    } else {
+      const createdAt = new Date();
+      payload.applyAttempts = 1;
+      payload.history = [
+        {
+          status: "Applied",
+          note: "Application submitted",
+          by: req.user._id,
+          at: createdAt,
+        },
+      ];
+      application = await Application.create(payload);
+      attemptNumber = 1;
+    }
+
     // increment application count on job (non-blocking)
     job.incApplications().catch(() => {});
     // increment total applications count on employer (non-blocking)
     employer.updateApplicationStats(1).catch(() => {});
+
+    createNotification({
+      user: req.user._id,
+      role: "jobseeker",
+      type: "application_status",
+      title: "Application submitted",
+      message:
+        attemptNumber === 2
+          ? `Application submitted again for ${job.title}. If you withdraw again, you cannot apply to this job anymore.`
+          : `Your application for ${job.title} at ${employer.organizationName} was submitted successfully.`,
+      ctaPath: "/dashboard/jobseeker/applications",
+      ctaLabel: "View Application",
+      metadata: {
+        applicationId: String(application._id),
+        status: "Applied",
+        jobId: String(job._id),
+        attemptNumber,
+      },
+      dedupeKey: `application-submitted:${application._id}:attempt-${attemptNumber}`,
+    }).catch(() => {});
 
     // Send emails in background (non-blocking)
     try {
@@ -138,7 +227,17 @@ exports.apply = async (req, res) => {
       ).catch(() => {});
     } catch (_) {}
 
-    return successResponse(res, 201, "Application submitted", { application });
+    const warning =
+      attemptNumber === 2
+        ? "Warning: if you withdraw this application again, you will not be able to apply for this job anymore."
+        : null;
+
+    return successResponse(
+      res,
+      existingApplication ? 200 : 201,
+      warning || "Application submitted",
+      { application, attemptNumber, warning }
+    );
   } catch (err) {
     console.error("Apply error:", err);
     if (err.code === 11000) {
@@ -370,13 +469,14 @@ exports.updateStatus = async (req, res) => {
 
     const oldStatus = application.status;
     const { status, note } = req.body;
+    const statusUpdatedAt = new Date();
     application.status = status;
-    application.updatedAtManual = new Date();
+    application.updatedAtManual = statusUpdatedAt;
     application.history.push({
       status,
       note,
       by: req.user._id,
-      at: new Date(),
+      at: statusUpdatedAt,
     });
     await application.save();
 
@@ -399,6 +499,17 @@ exports.updateStatus = async (req, res) => {
 
     // Notify jobseeker on key status changes
     try {
+      const candidateUserId = application.jobSeeker?.user?._id || application.jobSeeker?.user;
+      notifyApplicationStatusChange({
+        userId: candidateUserId,
+        status,
+        oldStatus,
+        jobTitle: application.job?.title,
+        companyName: application.employer?.organizationName,
+        applicationId: application._id,
+        dedupeKey: `application-status:${application._id}:${statusUpdatedAt.getTime()}`,
+      }).catch(() => {});
+
       if (["Interview", "Offered"].includes(status)) {
         const candidate = application.jobSeeker;
         const candidateName = candidate?.user
@@ -426,6 +537,62 @@ exports.updateStatus = async (req, res) => {
   } catch (err) {
     console.error("Update application status error:", err);
     return errorResponse(res, 500, "Failed to update application status");
+  }
+};
+
+// PATCH /applications/:id/withdraw (jobseeker)
+exports.withdrawMine = async (req, res) => {
+  try {
+    const jobSeeker = await JobSeeker.findOne({ user: req.user._id });
+    if (!jobSeeker) {
+      return errorResponse(res, 403, "Job seeker profile not found");
+    }
+
+    const application = await Application.findById(req.params.id)
+      .populate("job")
+      .populate("employer");
+
+    if (!application) return notFoundResponse(res, "Application not found");
+
+    if (application.jobSeeker.toString() !== jobSeeker._id.toString()) {
+      return forbiddenResponse(res, "Not authorized to withdraw this application");
+    }
+
+    if (["Rejected", "Withdrawn"].includes(application.status)) {
+      return errorResponse(
+        res,
+        400,
+        `Cannot withdraw an application in ${application.status} status`
+      );
+    }
+
+    const oldStatus = application.status;
+    const withdrawnAt = new Date();
+    application.status = "Withdrawn";
+    application.updatedAtManual = withdrawnAt;
+    application.history.push({
+      status: "Withdrawn",
+      note: req.body?.note || "Withdrawn by candidate",
+      by: req.user._id,
+      at: withdrawnAt,
+    });
+    await application.save();
+
+    let employer = application.employer;
+    if (!employer || !employer._id) {
+      employer = await Employer.findById(application.employer);
+    }
+
+    if (employer && oldStatus === "Offered") {
+      await employer.updateHireStats(-1);
+    }
+
+    return successResponse(res, 200, "Application withdrawn successfully", {
+      application,
+    });
+  } catch (err) {
+    console.error("Withdraw application error:", err);
+    return errorResponse(res, 500, "Failed to withdraw application");
   }
 };
 

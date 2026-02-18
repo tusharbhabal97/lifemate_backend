@@ -579,6 +579,54 @@ const sendWelcomeEmail = async (email, firstName, role) => {
   }
 };
 
+/**
+ * Send newsletter subscription confirmation email
+ * @param {string} email - Subscriber email
+ */
+const sendNewsletterSubscriptionEmail = async (email) => {
+  try {
+    const transporter = createTransporter();
+
+    const mailOptions = {
+      from: `"LifeMate" <${process.env.EMAIL_FROM || 'noreply@lifemate.com'}>`,
+      to: email,
+      subject: 'Subscribed Successfully - LifeMate Career Updates',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #155DFC 0%, #00B8DB 100%); padding: 28px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">LifeMate</h1>
+            <p style="color: white; margin: 10px 0 0 0; font-size: 15px;">Healthcare Career Platform</p>
+          </div>
+
+          <div style="padding: 28px; background: #f8f9fa;">
+            <h2 style="color: #111827; margin-top: 0;">Subscription Confirmed</h2>
+            <p style="color: #4b5563; line-height: 1.7;">
+              You are now subscribed to LifeMate updates. We will share relevant healthcare hiring trends,
+              new opportunities, and career tips.
+            </p>
+            <div style="text-align: center; margin: 26px 0 8px;">
+              <a href="${process.env.FRONTEND_URL || ''}/view-jobs" style="background: #155DFC; color: white; padding: 12px 26px; text-decoration: none; border-radius: 6px; font-weight: 700; display: inline-block;">
+                Explore Jobs
+              </a>
+            </div>
+          </div>
+
+          <div style="background: #111827; padding: 18px; text-align: center;">
+            <p style="color: #9ca3af; margin: 0; font-size: 12px;">© 2024 LifeMate. All rights reserved.</p>
+          </div>
+        </div>
+      `,
+    };
+
+    const result = await transporter.sendMail(mailOptions);
+    console.log('Newsletter subscription email sent:', result.messageId);
+    return result;
+  } catch (error) {
+    console.error('Error sending newsletter subscription email:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   sendVerificationEmail,
   sendPasswordResetEmail,
@@ -586,6 +634,7 @@ module.exports = {
   sendInterviewInvitationEmail,
   sendWelcomeEmail,
   sendOtpEmail,
+  sendNewsletterSubscriptionEmail,
   // Added exports below
   sendApplicationSubmittedToJobSeeker,
   sendApplicationStatusUpdateToJobSeeker,

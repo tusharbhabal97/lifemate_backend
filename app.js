@@ -12,10 +12,12 @@ const oauthRoutes = require('./routes/oauth');
 const jobRoutes = require('./routes/jobs');
 const applicationRoutes = require('./routes/applications');
 const savedJobRoutes = require('./routes/savedJobs');
+const notificationRoutes = require('./routes/notifications');
 const employerRoutes = require('./routes/employer');
 const jobSeekerRoutes = require('./routes/jobseeker');
 const resumeRoutes = require('./routes/resume');
 const adminRoutes = require('./routes/admin');
+const newsletterRoutes = require('./routes/newsletter');
 const passport = require('./config/passport');
 const { errorResponse } = require('./utils/response');
 
@@ -78,10 +80,12 @@ app.use('/api/oauth', oauthRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/saved-jobs', savedJobRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/employer', employerRoutes);
 app.use('/api/jobseeker', jobSeekerRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/resume', resumeRoutes);
+app.use('/api/newsletter', newsletterRoutes);
 
 app.get('/health', (req, res) => {
   res.status(200).json({
