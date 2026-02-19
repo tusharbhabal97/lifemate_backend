@@ -121,6 +121,16 @@ const jobSeekerSchema = new mongoose.Schema({
       trim: true,
       maxlength: [100, 'Doctor sub-specialty cannot exceed 100 characters'],
     },
+    otherDoctorSubSpecialty: {
+      type: String,
+      trim: true,
+      maxlength: [100, 'Other doctor field cannot exceed 100 characters'],
+    },
+    councilNo: {
+      type: String,
+      trim: true,
+      maxlength: [50, 'Council number cannot exceed 50 characters'],
+    },
     location: {
       country: {
         type: String,

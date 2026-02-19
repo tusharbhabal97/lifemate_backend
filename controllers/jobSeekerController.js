@@ -110,7 +110,11 @@ exports.updateMyProfile = async (req, res) => {
     if (Array.isArray(payload.professionalInfo?.specifications)) {
       const synced = [...payload.professionalInfo.specifications];
       if (payload.professionalInfo?.doctorSubSpecialty) {
-        synced.push(payload.professionalInfo.doctorSubSpecialty);
+        const doctorField =
+          payload.professionalInfo.doctorSubSpecialty === 'Other'
+            ? payload.professionalInfo.otherDoctorSubSpecialty || 'Other'
+            : payload.professionalInfo.doctorSubSpecialty;
+        synced.push(doctorField);
       }
       js.specializations = synced;
     }
