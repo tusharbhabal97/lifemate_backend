@@ -16,7 +16,17 @@ router.get('/employers', adminController.listEmployers);
 router.patch('/employers/:id/verify', adminController.verifyEmployer);
 router.patch('/employers/:id/unverify', adminController.unverifyEmployer);
 
+// Jobs moderation
+router.get('/jobs', adminController.listJobs);
+
+// Subscription and pricing management
+router.get('/subscriptions', adminController.listSubscriptions);
+router.patch('/subscriptions/:id', adminController.updateEmployerSubscription);
+router.get('/pricing-plans', adminController.getPricingPlans);
+router.put('/pricing-plans', adminController.updatePricingPlans);
+
 // Stats
 router.get('/stats', adminController.getStats);
+router.get('/analytics', adminController.getAnalytics);
 
 module.exports = router;

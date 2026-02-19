@@ -17,6 +17,7 @@ const employerRoutes = require('./routes/employer');
 const jobSeekerRoutes = require('./routes/jobseeker');
 const resumeRoutes = require('./routes/resume');
 const adminRoutes = require('./routes/admin');
+const pricingRoutes = require('./routes/pricing');
 const newsletterRoutes = require('./routes/newsletter');
 const passport = require('./config/passport');
 const { errorResponse } = require('./utils/response');
@@ -84,6 +85,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/employer', employerRoutes);
 app.use('/api/jobseeker', jobSeekerRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/pricing', pricingRoutes);
 app.use('/api/resume', resumeRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 
@@ -109,7 +111,7 @@ app.use('*', (req, res) => {
   return errorResponse(res, 404, 'Route not found');
 });
 
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   console.error('Global error handler:', err);
 
   if (err.name === 'ValidationError') {
