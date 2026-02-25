@@ -44,6 +44,11 @@ const employerSchema = new mongoose.Schema({
       'Other'
     ],
   },
+  organizationTypeOther: {
+    type: String,
+    trim: true,
+    maxlength: [120, 'Other organization type cannot exceed 120 characters'],
+  },
   
   // Organization Details
   description: {
@@ -64,6 +69,11 @@ const employerSchema = new mongoose.Schema({
   employeeCount: {
     type: String,
     enum: ['1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5000+'],
+  },
+  numberOfBeds: {
+    type: Number,
+    min: [0, 'Number of beds cannot be negative'],
+    max: [100000, 'Number of beds cannot exceed 100000'],
   },
   
   // Contact Information
@@ -227,6 +237,70 @@ const employerSchema = new mongoose.Schema({
     certificateUrl: {
       type: String,
       trim: true,
+    },
+  }],
+
+  // Regulatory and compliance documents for healthcare organizations
+  employerCertificates: [{
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      enum: [
+        'Bombay Nursing Certificate',
+        'Hospital Registration Certificate',
+        'NABH Entry Level Certificate',
+        'ISO Certification',
+        'NABH Full Accreditation',
+        'NABL Accreditation',
+        'Fire Safety NOC',
+        'Clinical Establishment License',
+        'Biomedical Waste Authorization',
+        'PCPNDT Certificate',
+        'AERB License',
+        'Other',
+      ],
+    },
+    customName: {
+      type: String,
+      trim: true,
+      maxlength: [120, 'Custom certificate name cannot exceed 120 characters'],
+    },
+    category: {
+      type: String,
+      enum: ['Mandatory', 'Optional'],
+      required: true,
+      default: 'Optional',
+    },
+    issuingBody: {
+      type: String,
+      trim: true,
+      maxlength: [100, 'Issuing body cannot exceed 100 characters'],
+    },
+    issueDate: {
+      type: Date,
+    },
+    expiryDate: {
+      type: Date,
+      validate: {
+        validator: function(value) {
+          return !value || !this.issueDate || value >= this.issueDate;
+        },
+        message: 'Certificate expiry date must be after issue date',
+      },
+    },
+    documentUrl: {
+      type: String,
+      trim: true,
+    },
+    driveFileId: {
+      type: String,
+      trim: true,
+    },
+    notes: {
+      type: String,
+      trim: true,
+      maxlength: [300, 'Certificate notes cannot exceed 300 characters'],
     },
   }],
   

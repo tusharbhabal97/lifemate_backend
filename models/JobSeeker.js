@@ -136,6 +136,19 @@ const jobSeekerSchema = new mongoose.Schema({
       trim: true,
       maxlength: [50, 'Council number cannot exceed 50 characters'],
     },
+    registrationDate: {
+      type: Date,
+    },
+    registrationExpiryDate: {
+      type: Date,
+      validate: {
+        validator: function(value) {
+          const registrationDate = this.registrationDate;
+          return !value || !registrationDate || value >= registrationDate;
+        },
+        message: 'Registration expiry date must be after registration date',
+      },
+    },
     location: {
       country: {
         type: String,

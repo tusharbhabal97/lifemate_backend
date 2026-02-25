@@ -135,10 +135,37 @@ exports.updateMyProfile = async (req, res) => {
             : value.doctorSubSpecialty
               ? [value.doctorSubSpecialty]
               : [];
+          const registrationDate = value.registrationDate
+            ? new Date(value.registrationDate)
+            : undefined;
+          const registrationExpiryDate = value.registrationExpiryDate
+            ? new Date(value.registrationExpiryDate)
+            : undefined;
+
+          if (registrationDate && Number.isNaN(registrationDate.getTime())) {
+            return errorResponse(res, 400, 'Please provide a valid doctor registration date');
+          }
+          if (registrationExpiryDate && Number.isNaN(registrationExpiryDate.getTime())) {
+            return errorResponse(res, 400, 'Please provide a valid doctor registration expiry date');
+          }
+          if (
+            registrationDate &&
+            registrationExpiryDate &&
+            registrationExpiryDate < registrationDate
+          ) {
+            return errorResponse(
+              res,
+              400,
+              'Doctor registration expiry date must be after registration date'
+            );
+          }
+
           value = {
             ...value,
             doctorSubSpecialties,
             doctorSubSpecialty: doctorSubSpecialties[0] || value.doctorSubSpecialty || '',
+            registrationDate: registrationDate || value.registrationDate,
+            registrationExpiryDate: registrationExpiryDate || value.registrationExpiryDate,
           };
         }
         if (key === 'jobPreferences' && value && typeof value === 'object') {

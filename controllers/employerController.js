@@ -1,5 +1,23 @@
 const Employer = require('../models/Employer');
 const { successResponse, errorResponse, validationErrorResponse, notFoundResponse, getPaginationMeta } = require('../utils/response');
+const { uploadToDrive, RESUME_FOLDER_ID } = require('../config/googleDrive');
+
+const MANDATORY_CERTIFICATE_NAMES = [
+  'Bombay Nursing Certificate',
+  'Hospital Registration Certificate',
+  'NABH Entry Level Certificate',
+];
+
+const ALLOWED_CERTIFICATE_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/webp',
+]);
 
 // GET /api/employer/profile
 exports.getMyProfile = async (req, res) => {
@@ -35,7 +53,140 @@ exports.refreshProfile = async (req, res) => {
 // POST /api/employer/profile (create or update in one call)
 exports.createOrUpdateProfile = async (req, res) => {
   try {
-    const body = req.body;
+    let body = { ...(req.body || {}) };
+
+    if (typeof req.body?.profile === 'string') {
+      try {
+        body = JSON.parse(req.body.profile);
+      } catch {
+        return errorResponse(res, 400, 'Invalid profile payload');
+      }
+    }
+
+    if (typeof body.employerCertificates === 'string') {
+      try {
+        body.employerCertificates = JSON.parse(body.employerCertificates);
+      } catch {
+        body.employerCertificates = [];
+      }
+    }
+
+    if (body.organizationType === 'Other' && !String(body.organizationTypeOther || '').trim()) {
+      return validationErrorResponse(res, [
+        { field: 'organizationTypeOther', message: 'Please specify organization type when selecting Other' },
+      ]);
+    }
+
+    if (body.numberOfBeds !== undefined && body.numberOfBeds !== null && body.numberOfBeds !== '') {
+      const beds = Number(body.numberOfBeds);
+      if (!Number.isFinite(beds) || beds < 0) {
+        return validationErrorResponse(res, [
+          { field: 'numberOfBeds', message: 'Please provide a valid number of beds' },
+        ]);
+      }
+      body.numberOfBeds = Math.floor(beds);
+    } else if (body.numberOfBeds === '') {
+      body.numberOfBeds = undefined;
+    }
+
+    if (Array.isArray(body.employerCertificates)) {
+      const uploadedCertificateFiles = req.files?.employerCertificateFiles || [];
+      const fileKeysRaw = req.body?.employerCertificateFileKeys;
+      const fileKeys = Array.isArray(fileKeysRaw)
+        ? fileKeysRaw
+        : fileKeysRaw
+          ? [fileKeysRaw]
+          : [];
+      const uploadedByKey = {};
+
+      for (const file of uploadedCertificateFiles) {
+        if (!ALLOWED_CERTIFICATE_MIME_TYPES.has(file.mimetype)) {
+          return errorResponse(
+            res,
+            400,
+            `Unsupported document type for certificate upload: ${file.mimetype}`
+          );
+        }
+      }
+
+      const uploadResults = await Promise.all(
+        uploadedCertificateFiles.map(async (file, index) => {
+          const uploadKey = String(fileKeys[index] || '').trim();
+          const safeOriginalName = String(file.originalname || 'certificate')
+            .replace(/[^\w.\-]+/g, '_')
+            .slice(0, 120);
+          const uploaded = await uploadToDrive(
+            file.buffer,
+            `employer_certificate_${req.user._id}_${Date.now()}_${index}_${safeOriginalName}`,
+            RESUME_FOLDER_ID,
+            file.mimetype
+          );
+          return {
+            uploadKey,
+            url: uploaded.webViewLink,
+            driveFileId: uploaded.fileId,
+          };
+        })
+      );
+
+      for (const item of uploadResults) {
+        if (!item.uploadKey) continue;
+        uploadedByKey[item.uploadKey] = {
+          url: item.url,
+          driveFileId: item.driveFileId,
+        };
+      }
+
+      body.employerCertificates = body.employerCertificates
+        .filter((item) => item && typeof item === 'object')
+        .map((item) => ({
+          ...item,
+          name: String(item.name || '').trim(),
+          customName: String(item.customName || '').trim(),
+          category: item.category === 'Mandatory' ? 'Mandatory' : 'Optional',
+          issuingBody: String(item.issuingBody || '').trim(),
+          documentUrl: String(
+            uploadedByKey[String(item.uploadKey || '').trim()]?.url || item.documentUrl || ''
+          ).trim(),
+          driveFileId: String(
+            uploadedByKey[String(item.uploadKey || '').trim()]?.driveFileId || item.driveFileId || ''
+          ).trim(),
+          notes: String(item.notes || '').trim(),
+        }))
+        .filter((item) => item.name);
+
+      const invalidOther = body.employerCertificates.find(
+        (item) => item.name === 'Other' && !item.customName
+      );
+      if (invalidOther) {
+        return validationErrorResponse(res, [
+          { field: 'employerCertificates', message: 'Custom name is required when certificate type is Other' },
+        ]);
+      }
+
+      const missingMandatory = MANDATORY_CERTIFICATE_NAMES.filter((requiredName) => {
+        const found = body.employerCertificates.find(
+          (item) => item.name === requiredName && item.documentUrl
+        );
+        return !found;
+      });
+
+      if (missingMandatory.length > 0) {
+        return validationErrorResponse(res, [
+          {
+            field: 'employerCertificates',
+            message: `Mandatory certificates are missing: ${missingMandatory.join(', ')}`,
+          },
+        ]);
+      }
+    } else {
+      return validationErrorResponse(res, [
+        {
+          field: 'employerCertificates',
+          message: 'Please upload mandatory employer certificates',
+        },
+      ]);
+    }
 
     let employer = await Employer.findOne({ user: req.user._id });
 
