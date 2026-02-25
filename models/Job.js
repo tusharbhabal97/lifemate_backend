@@ -4,41 +4,6 @@ const mongoose = require('mongoose');
  * Job Schema - Represents a job post created by an employer
  * Supports filters and columns shown on the Job & Content Management page
  */
-const SPECIALIZATIONS = [
-  'General Medicine',
-  'Cardiology',
-  'Neurology',
-  'Orthopedics',
-  'Pediatrics',
-  'Gynecology',
-  'Dermatology',
-  'Psychiatry',
-  'Radiology',
-  'Anesthesiology',
-  'Emergency Medicine',
-  'Internal Medicine',
-  'Surgery',
-  'Oncology',
-  'Pathology',
-  'Ophthalmology',
-  'ENT',
-  'Urology',
-  'Gastroenterology',
-  'Pulmonology',
-  'Endocrinology',
-  'Rheumatology',
-  'Nephrology',
-  'Hematology',
-  'Infectious Disease',
-  'Physical Therapy',
-  'Occupational Therapy',
-  'Speech Therapy',
-  'Nursing',
-  'Pharmacy',
-  'Medical Technology',
-  'Other',
-];
-
 const jobSchema = new mongoose.Schema({
   // Owner
   employer: {
@@ -68,8 +33,9 @@ const jobSchema = new mongoose.Schema({
   },
   specialization: {
     type: String,
-    enum: SPECIALIZATIONS,
     required: [true, 'Specialization is required'],
+    trim: true,
+    maxlength: [100, 'Specialization cannot exceed 100 characters'],
     index: true,
   },
   experienceRequired: {
